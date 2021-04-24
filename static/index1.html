@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <!-- Add this to <head> -->
+
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <!-- Load required Bootstrap and BootstrapVue CSS -->
+    <link type="text/css" rel="stylesheet" href="//unpkg.com/bootstrap/dist/css/bootstrap.min.css"/>
+    <link type="text/css" rel="stylesheet" href="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.css"/>
+
+    <!-- Load polyfills to support older browsers -->
+    <script src="//polyfill.io/v3/polyfill.min.js?features=es2015%2CIntersectionObserver"
+            crossorigin="anonymous"></script>
+
+    <!-- Load Vue followed by BootstrapVue -->
+    <script src="//unpkg.com/vue@latest/dist/vue.min.js"></script>
+    <script src="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
+
+    <!-- Load the following for BootstrapVueIcons support -->
+    <script src="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue-icons.min.js"></script>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/x2js/1.2.0/xml2json.min.js"
+            integrity="sha512-HX+/SvM7094YZEKOCtG9EyjRYvK8dKlFhdYAnVCGNxMkA59BZNSZTZrqdDlLXp0O6/NjDb1uKnmutUeuzHb3iQ=="
+            crossorigin="anonymous"></script>
+
+    <meta charset="utf-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>中央车载</title>
+
+
+</head>
+<body>
+<div id="app">
+    <template>
+        <div class="container-fluid">
+            <!--    <b-container class="bv-example-row">-->
+
+            <legend></legend>
+            <!--    <b-button variant="primary" disabled v-if="month_list==null">-->
+            <!--      <b-spinner small type="grow"></b-spinner>-->
+            <!--      Loading...-->
+            <!--    </b-button>-->
+
+            <div class="text-center text-danger my-2" v-if="month_list===null">
+                <b-spinner class="align-middle"></b-spinner>
+                <strong>Loading...</strong>
+            </div>
+
+
+            <b-row v-if="month_list!==null">
+                <b-col>
+                    <label class="mr-sm-2">选择日期:</label>
+                    <select v-model="selected" @change="greet">
+                        <option v-for="option in month_list"
+                                v-bind:value="option.value" v-text="option.text">
+
+                        </option>
+                    </select>
+                </b-col>
+
+            </b-row>
+            <!--      </b-row>-->
+            <!--    </b-container>-->
+
+            <div class="text-center text-danger my-2" v-if="isBusy">
+                <b-spinner class="align-middle"></b-spinner>
+                <strong>Loading...</strong>
+            </div>
+            <b-row>
+                <b-col>
+                    <b-table
+                            class="table table-condensed"
+                            v-if="info&&!isBusy"
+                            :striped="true"
+                            :bordered="true"
+                            :hover="true"
+                            :small="true"
+                            :stacked="false"
+                            :fixed="false"
+                            :responsive="true"
+                            :sticky-header="false"
+                            :fields="info.head"
+                            :items="info.data"
+                            :tbody-tr-class="'text-nowrap'"
+                    >
+
+                        <template v-slot:thead-top="data">
+                            <b-tr>
+                                <b-th class="table-b-table-default b-table-sticky-column">
+                                    <div>星期</div>
+                                </b-th>
+                                <b-th v-for="(value) in info.week">{{ value.week_str }}
+                                </b-th>
+                            </b-tr>
+                        </template>
+
+                        <template v-slot:cell()="data">
+                            <div class="">{{ data.value }}</div>
+                        </template>
+
+                    </b-table>
+                </b-col>
+            </b-row>
+
+            <b-row>
+                <b-col>
+
+                    <div v-if="month_list!==null">上传时间: {{ file_info.time }}</div>
+                    <div v-for="(value) in message">{{ value }}</div>
+
+
+                </b-col>
+            </b-row>
+        </div>
+    </template>
+</div>
+<script type="text/javascript">
+    Vue.prototype.$axios = axios;
+    const app = new Vue({
+        el: '#app',
+        data: {
+            message: [],
+            info: null,
+            month_list: null,
+            file_info: null,
+            selected: null,
+            isBusy: false,
+            holidays: null,
+        },
+        mounted() {
+            console.log('app created...');
+            console.log(this.message);
+            this.$axios
+                .get('/api/month_list/')
+                .then(response => {
+                    this.month_list = [];
+                    let month_list = response.data;
+                    this.last_change = month_list.last_change;
+                    this.file_info = month_list.file_info[0];
+                    let yeah_ = new Set();
+                    for (let dataKey of month_list.month_list) {
+                        console.log(dataKey);
+                        this.month_list.push({value: dataKey, text: dataKey});
+                        yeah_.add(dataKey.substr(0, 4));
+                    }
+                    for (let i of yeah_) {
+                        this.get_holidays(i, this.message);
+                    }
+                })
+                .catch(function (error) { // 请求失败处理
+                    console.log(error);
+                    this.message.push("加载月份信息错误")
+                });
+
+
+        },
+        methods: {
+            get_holidays(yeah, message) {
+                this.$axios
+                    .get('api/holidays_list/?yeah=' + yeah)
+                    .then(response => {
+                        this.holidays = response.data;
+                        message.push("加载" + yeah + "节假日信息成功");
+                    })
+                    .catch(function (error) { // 请求失败处理
+                        console.log(error);
+                        this.holidays = null;
+                        message.push("加载" + yeah + "节假日信息失败");
+                    });
+            },
+
+            greet(event) {
+                this.get_duty_data(event.target.value);
+            },
+
+            get_week(value) {
+                if (value == null || value.length < 6) {
+                    return 7;
+                }
+                let s = value.substr(0, 4) + "-" + value.substr(4, 2) + "-" + value.substr(6, 2);
+                let date_t = new Date(s);
+                return date_t.getDay();
+            },
+
+            is_work(value) {
+                let week = {};
+                for (let i of this.info.week) {
+                    if (i.date === value) {
+                        week = i;
+                    }
+                }
+                let s = value.substr(0, 4) + "-" + value.substr(4, 2) + "-" + value.substr(6, 2);
+                if (this.holidays !== null) {
+                    for (let i of this.holidays.days) {
+                        if (i.date === s) {
+                            return i.isOffDay;
+                        }
+                    }
+                }
+                return week.week_index === 0 || week.week_index === 6
+            },
+            xml_handler(data) {
+                let res = new Map();
+                const x2js = new X2JS();
+                const jsonObj = x2js.xml_str2json(data);
+                let array = [];
+                //console.log(jsonObj)
+                let table = jsonObj.Envelope.Body.GetTableBySqlResponse.GetTableBySqlResult.diffgram.NewDataSet.Table;
+                for (const tableKey of table) {
+                    if (res[tableKey.UserName] === undefined) {
+                        res[tableKey.UserName] = {};
+                        res[tableKey.UserName]["UserName"] = tableKey.UserName;
+                    }
+                    // res[tableKey.UserName] = {UserName: tableKey.UserName}
+                    res[tableKey.UserName][tableKey.ScheduleDay] = tableKey.ScheduleName
+                }
+                for (let key in res) {
+                    let obj = res[key]
+                    // obj.id = key
+                    array.push(obj)
+                }
+                return array
+            },
+            get_duty_data(month) {
+                this.isBusy = true;
+                this.info = {};
+                this.$axios
+                    .get('/api/duty_table/?month=' + month)
+                    .then(response => {
+                        this.info.data = this.xml_handler(response.data);
+                        let s = new Set();
+                        for (let el of this.info.data) {
+                            for (let elKey in el) {
+                                s.add(elKey);
+                            }
+                        }
+                        const weeks = "日一二三四五六"
+                        let head = [];
+                        this.info.week = [];
+                        for (let i of s) {
+                            if (i === 'UserName') {
+                                head.splice(0, 0, {key: i, label: month, stickyColumn: true});
+                            } else {
+                                let week = this.get_week(i);
+                                this.info.week.push({date: i, week_str: weeks.charAt(week), week_index: week});
+                                const class_ = this.is_work(i) ? "table-success" : ""
+                                head.push({
+                                    key: i,
+                                    label: i.slice(6),
+                                    tdClass: class_
+                                });
+                            }
+                        }
+                        this.info.head = head;
+
+                        this.isBusy = false;
+                    })
+                    .catch(function (error) { // 请求失败处理
+                        console.log(error);
+                        this.isBusy = false;
+                    });
+            }
+        },
+    });
+</script>
+</body>
+</html>
