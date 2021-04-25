@@ -3,6 +3,7 @@ import re
 import requests
 from cloudant import Cloudant
 from flask import Flask, render_template, request, jsonify
+from flask_compress import Compress
 import atexit
 import os
 import json
@@ -10,6 +11,7 @@ import json
 import pan
 
 app = Flask(__name__, static_url_path='')
+Compress(app)
 
 db_name = 'mydb'
 client = None
